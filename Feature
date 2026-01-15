@@ -1,0 +1,21 @@
+我要設計一個web UI，主要是一個設定視窗給使用者做設定操作
+UI/UX的設計請參考根目錄下的.claude/skills裡面的內容
+
+使用者設定視窗細節如下面
+一共有3大主題
+(1) AC Timing, (2)DC Electrical, (3)Programmable Gain Setting
+
+每個主題再分成幾個項目
+AC Timing : (1)Sensor, (2)Heater
+DC Electrical : PMIC
+Programmable Gain Setting : Digital Potentiometer
+
+每個項目裡就是可以設定的變數
+AC Timing的Sensor有五個變數可以設定 : T1 / T2 / T3 / T4 / T5
+AC Timing的Heater有五個變數可以設定 : TSW1b / TSW2b / TSW3b / TSW3a / TSW2a / TSW1a
+
+DC Electrical的PMIC有兩個變數可以設定 : VD / VG
+
+而Programmable Gain Setting的Digital Potentiometer還會再多一層才有變數可以設定
+Digital Potentiometer裡面有五個參數 : CS0 / CS1 / CS2 / CS3 / CS4 / CS5
+CS0~CS5中都分別有四個變數可以設定 : Wiper0 / Wiper1 / Wiper2 / Wiper3
