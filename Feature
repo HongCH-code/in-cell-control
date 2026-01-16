@@ -1,0 +1,42 @@
+我要設計一個web UI，主要是一個設定視窗給使用者做設定操作
+UI/UX的設計請參考根目錄下的.claude/skills裡面的內容
+
+使用者設定視窗細節如下面
+一共有3大主題
+(1) AC Timing, (2)DC Electrical, (3)Programmable Gain Setting
+
+每個主題再分成幾個項目
+AC Timing : (1)Sensor, (2)Heater
+DC Electrical : PMIC
+Programmable Gain Setting : Digital Potentiometer
+
+每個項目裡就是可以設定的變數 : 
+AC Timing的Sensor有六個變數可以設定 : T0 / T1 / T2 / T3 / T4 / T5
+AC Timing的Heater有六個變數可以設定 : TSW1b / TSW2b / TSW3b / TSW3a / TSW2a / TSW1a
+範圍 : 0~334, step : 1
+
+DC Electrical的PMIC有兩個變數可以設定 : VD / VG
+VD範圍 : 7~30, step : 0.5
+VG範圍 : -6~-18, step : 0.25
+
+而Programmable Gain Setting的Digital Potentiometer還會再多一層才有變數可以設定
+Digital Potentiometer裡面有六個參數 : CS0 / CS1 / CS2 / CS3 / CS4 / CS5
+CS0~CS5中都分別有四個變數可以設定 : Wiper0 / Wiper1 / Wiper2 / Wiper3
+範圍 : 0~255, step : 1
+
+
+參數說明
+T0 : N frame for dummy stabilization
+T1 : N frame for sensing stabilization
+T2 : VSYNC to sensing start
+T3 : VSYNC to sensing end
+T4 : VSYNC to VD/VG off
+T5 : VSYNC to VD/VG ON
+TSW1b : VSYNC to heater SW off
+TSW2b : VSYNC to low SW off
+TSW3b : VSYNC to TP SW ON
+TSW3a : VSYNC to TP SW off
+TSW2a : VSYNC to low SW ON
+TSW1a : VSYNC to heater SW ON
+VD : Sensor TFT drain voltage
+VG : Sensor TFT gate voltage

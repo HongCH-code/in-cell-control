@@ -1,0 +1,56 @@
+{
+  "name": "in-cell-parameter-setting",
+  "version": "1.0.0",
+  "description": "In Cell Parameter Setting - Configure AC Timing, DC Electrical, and Programmable Gain settings",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:css": "npx tailwindcss -i ./src/input.css -o ./styles.css --minify",
+    "build": "npm run build:css && electron-builder --mac --win",
+    "build:mac": "npm run build:css && electron-builder --mac",
+    "build:win": "npm run build:css && electron-builder --win"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.18",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "tailwindcss": "^4.1.18"
+  },
+  "build": {
+    "appId": "com.amsc.incell-parameter-setting",
+    "productName": "In Cell Parameter Setting",
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "styles.css",
+      "Timing.png"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "dependencies": {
+    "serialport": "^13.0.0"
+  }
+}

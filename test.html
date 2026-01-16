@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCU Communication Test</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    html { scroll-behavior: smooth; }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #E2E8F0;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #94A3B8;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #64748B;
+    }
+
+    /* MCU Message scrollbar - always visible */
+    #mcu-prompt {
+      overflow-y: scroll !important;
+    }
+    #mcu-prompt::-webkit-scrollbar {
+      width: 10px;
+    }
+    #mcu-prompt::-webkit-scrollbar-track {
+      background: #DBEAFE;
+      border-radius: 4px;
+    }
+    #mcu-prompt::-webkit-scrollbar-thumb {
+      background: #60A5FA;
+      border-radius: 4px;
+    }
+    #mcu-prompt::-webkit-scrollbar-thumb:hover {
+      background: #3B82F6;
+    }
+
+    /* Log area styling */
+    .log-area {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .log-entry {
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-bottom: 4px;
+    }
+
+    .log-rx {
+      background-color: #DBEAFE;
+      color: #1E40AF;
+    }
+
+    .log-tx {
+      background-color: #DCFCE7;
+      color: #166534;
+    }
+
+    .log-system {
+      background-color: #F1F5F9;
+      color: #64748B;
+      font-style: italic;
+    }
+
+    .log-error {
+      background-color: #FEE2E2;
+      color: #DC2626;
+    }
+
+    /* Prompt highlight */
+    .prompt-highlight {
+      animation: pulse-bg 1s ease-in-out infinite;
+    }
+
+    @keyframes pulse-bg {
+      0%, 100% { background-color: #FEF3C7; }
+      50% { background-color: #FDE68A; }
+    }
+
+    /* Input focus */
+    .input-focus-ring:focus {
+      outline: none;
+      ring: 2px;
+      ring-color: #3B82F6;
+      border-color: #3B82F6;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+
+  <!-- Main Container -->
+  <div class="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+
+    <!-- Header -->
+    <header class="mb-6 text-center">
+      <h1 class="text-2xl font-bold text-slate-900">MCU Communication Test</h1>
+      <p class="text-slate-600 mt-1">Interactive UART communication testing tool</p>
+    </header>
+
+    <!-- Serial Port Connection -->
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
+      <div class="px-6 py-4 flex flex-wrap items-center gap-4">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-slate-500" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+          </svg>
+          <span class="text-sm font-medium text-slate-700">Serial Port</span>
+        </div>
+
+        <!-- Port Selector -->
+        <div class="flex items-center gap-2">
+          <label for="port-select" class="text-sm text-slate-600">Port:</label>
+          <select id="port-select" class="h-9 px-3 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer">
+            <option value="">Select Port</option>
+          </select>
+          <button id="refresh-ports-btn" type="button" class="h-9 w-9 flex items-center justify-center border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer" title="Refresh ports">
+            <svg class="w-4 h-4 text-slate-600" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Baud Rate Selector -->
+        <div class="flex items-center gap-2">
+          <label for="baudrate-select" class="text-sm text-slate-600">Baud Rate:</label>
+          <select id="baudrate-select" class="h-9 px-3 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer">
+            <option value="9600">9600</option>
+            <option value="19200">19200</option>
+            <option value="38400">38400</option>
+            <option value="57600">57600</option>
+            <option value="115200" selected>115200</option>
+            <option value="230400">230400</option>
+            <option value="460800">460800</option>
+            <option value="921600">921600</option>
+          </select>
+        </div>
+
+        <!-- Data Bits -->
+        <div class="flex items-center gap-2">
+          <label for="databits-select" class="text-sm text-slate-600">Data:</label>
+          <select id="databits-select" class="h-9 px-3 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer">
+            <option value="7">7</option>
+            <option value="8" selected>8</option>
+          </select>
+        </div>
+
+        <!-- Parity -->
+        <div class="flex items-center gap-2">
+          <label for="parity-select" class="text-sm text-slate-600">Parity:</label>
+          <select id="parity-select" class="h-9 px-3 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer">
+            <option value="none" selected>None</option>
+            <option value="even">Even</option>
+            <option value="odd">Odd</option>
+          </select>
+        </div>
+
+        <!-- Stop Bits -->
+        <div class="flex items-center gap-2">
+          <label for="stopbits-select" class="text-sm text-slate-600">Stop:</label>
+          <select id="stopbits-select" class="h-9 px-3 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer">
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+          </select>
+        </div>
+
+        <!-- Connect/Disconnect Button -->
+        <button id="connect-btn" type="button" class="h-9 px-4 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition-colors cursor-pointer">
+          Connect
+        </button>
+
+        <!-- Status Indicator -->
+        <div class="flex items-center gap-2 ml-auto">
+          <div id="status-dot" class="w-3 h-3 rounded-full bg-slate-300"></div>
+          <span id="status-text" class="text-sm text-slate-600">Disconnected</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Communication Area -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- Left: Current Prompt & Input -->
+      <div class="space-y-4">
+        <!-- Current MCU Prompt -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div class="px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-blue-800 flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+              MCU Message
+            </h2>
+            <button id="clear-mcu-btn" type="button" class="text-xs text-blue-600 hover:text-blue-800 transition-colors cursor-pointer">
+              Clear
+            </button>
+          </div>
+          <div class="px-6 py-4">
+            <div id="mcu-prompt" class="font-mono text-slate-800 bg-slate-50 rounded-xl p-4 whitespace-pre-wrap text-sm leading-relaxed" style="height: 400px; overflow-y: scroll;">
+              <span class="text-slate-400">Waiting for MCU...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- User Input -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div class="px-6 py-3 bg-green-50 border-b border-green-100">
+            <h2 class="text-sm font-semibold text-green-800 flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+              </svg>
+              Your Response
+            </h2>
+          </div>
+          <div class="px-6 py-4">
+            <div class="flex gap-3">
+              <input
+                type="text"
+                id="user-input"
+                class="flex-1 h-12 px-4 text-lg font-mono border-2 border-slate-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                placeholder="Enter value or leave empty for default..."
+                disabled
+              >
+              <button
+                id="send-btn"
+                type="button"
+                class="h-12 px-6 text-sm font-semibold text-white bg-blue-500 rounded-xl hover:bg-blue-600 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                disabled
+              >
+                Send
+              </button>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">Leave empty and press Send to keep MCU default value</p>
+            <!-- Line ending option -->
+            <div class="flex items-center gap-4 mt-3">
+              <span class="text-sm text-slate-600">Line ending:</span>
+              <label class="flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="line-ending" value="none" class="cursor-pointer">
+                <span class="text-sm text-slate-700">None</span>
+              </label>
+              <label class="flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="line-ending" value="cr" checked class="cursor-pointer">
+                <span class="text-sm text-slate-700">CR</span>
+              </label>
+              <label class="flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="line-ending" value="lf" class="cursor-pointer">
+                <span class="text-sm text-slate-700">LF</span>
+              </label>
+              <label class="flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="line-ending" value="crlf" class="cursor-pointer">
+                <span class="text-sm text-slate-700">CR+LF</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div class="px-6 py-3 bg-slate-50 border-b border-slate-100">
+            <h2 class="text-sm font-semibold text-slate-700">Quick Actions</h2>
+          </div>
+          <div class="px-6 py-4 flex flex-wrap gap-2">
+            <button type="button" class="quick-send h-8 px-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer" data-value="0">0</button>
+            <button type="button" class="quick-send h-8 px-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer" data-value="1">1</button>
+            <button type="button" class="quick-send h-8 px-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer" data-value="100">100</button>
+            <button type="button" class="quick-send h-8 px-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer" data-value="255">255</button>
+            <button type="button" class="quick-send h-8 px-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer" data-value="OK">OK</button>
+            <button type="button" class="quick-send h-8 px-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer" data-value="YES">YES</button>
+            <button type="button" class="quick-send h-8 px-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer" data-value="NO">NO</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Communication Log -->
+      <div class="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col" style="min-height: 400px;">
+        <div class="px-6 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            Communication Log
+          </h2>
+          <button id="clear-log-btn" type="button" class="text-xs text-slate-500 hover:text-slate-700 transition-colors cursor-pointer">
+            Clear
+          </button>
+        </div>
+        <div id="log-container" class="flex-1 overflow-y-auto p-4 log-area bg-slate-50">
+          <div class="log-entry log-system">[System] Ready to communicate. Connect to a serial port to begin.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-6 text-center text-sm text-slate-500">
+      <p>Press <kbd class="px-2 py-1 bg-slate-200 rounded text-xs font-mono">Enter</kbd> to send after typing your response</p>
+    </footer>
+
+  </div>
+
+  <script>
+    // State
+    let isConnected = false;
+    let currentPrompt = null;
+
+    // DOM Elements
+    const portSelect = document.getElementById('port-select');
+    const baudrateSelect = document.getElementById('baudrate-select');
+    const databitsSelect = document.getElementById('databits-select');
+    const paritySelect = document.getElementById('parity-select');
+    const stopbitsSelect = document.getElementById('stopbits-select');
+    const refreshBtn = document.getElementById('refresh-ports-btn');
+    const connectBtn = document.getElementById('connect-btn');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const mcuPrompt = document.getElementById('mcu-prompt');
+    const userInput = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    const logContainer = document.getElementById('log-container');
+    const clearLogBtn = document.getElementById('clear-log-btn');
+    const quickSendBtns = document.querySelectorAll('.quick-send');
+    const lineEndingRadios = document.querySelectorAll('input[name="line-ending"]');
+
+    // Get selected line ending
+    function getLineEnding() {
+      const selected = document.querySelector('input[name="line-ending"]:checked').value;
+      switch (selected) {
+        case 'cr': return '\r';
+        case 'lf': return '\n';
+        case 'crlf': return '\r\n';
+        default: return '';
+      }
+    }
+
+    // Add log entry
+    function addLog(type, message) {
+      const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type}`;
+
+      let prefix = '';
+      switch (type) {
+        case 'rx': prefix = 'RX'; break;
+        case 'tx': prefix = 'TX'; break;
+        case 'system': prefix = 'SYS'; break;
+        case 'error': prefix = 'ERR'; break;
+      }
+
+      entry.textContent = `[${timestamp}] [${prefix}] ${message}`;
+      logContainer.appendChild(entry);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    // MCU message history
+    let mcuMessages = [];
+
+    // Update MCU prompt display
+    function updateMcuPrompt(text) {
+      currentPrompt = text;
+      mcuMessages.push(text);
+      // Keep all messages, no limit
+      renderMcuMessages();
+      mcuPrompt.classList.add('prompt-highlight');
+      setTimeout(() => mcuPrompt.classList.remove('prompt-highlight'), 2000);
+      // Auto scroll to bottom
+      mcuPrompt.scrollTop = mcuPrompt.scrollHeight;
+    }
+
+    // Render MCU messages
+    function renderMcuMessages() {
+      if (mcuMessages.length === 0) {
+        mcuPrompt.innerHTML = '<span class="text-slate-400">Waiting for MCU...</span>';
+        return;
+      }
+      mcuPrompt.innerHTML = mcuMessages.map((msg, idx) => {
+        const isLatest = idx === mcuMessages.length - 1;
+        const colorClass = isLatest ? 'text-blue-600 font-bold' : 'text-slate-600';
+        return `<div class="${colorClass}">${msg}</div>`;
+      }).join('');
+    }
+
+    // Clear MCU prompt
+    function clearMcuPrompt() {
+      currentPrompt = null;
+      mcuMessages = [];
+      mcuPrompt.innerHTML = '<span class="text-slate-400">Waiting for MCU...</span>';
+    }
+
+    // Refresh available ports
+    async function refreshPorts() {
+      const result = await window.serialAPI.listPorts();
+      if (result.success) {
+        const currentValue = portSelect.value;
+        portSelect.innerHTML = '<option value="">Select Port</option>';
+        result.ports.forEach(port => {
+          const option = document.createElement('option');
+          option.value = port.path;
+          option.textContent = `${port.path}${port.manufacturer ? ' - ' + port.manufacturer : ''}`;
+          portSelect.appendChild(option);
+        });
+        // Restore selection if still available
+        if (currentValue && result.ports.some(p => p.path === currentValue)) {
+          portSelect.value = currentValue;
+        }
+        addLog('system', `Found ${result.ports.length} serial port(s)`);
+      } else {
+        addLog('error', `Failed to list ports: ${result.error}`);
+      }
+    }
+
+    // Connect to serial port
+    async function connect() {
+      const port = portSelect.value;
+      const baudRate = parseInt(baudrateSelect.value);
+      const dataBits = parseInt(databitsSelect.value);
+      const parity = paritySelect.value;
+      const stopBits = parseInt(stopbitsSelect.value);
+
+      if (!port) {
+        addLog('error', 'Please select a port first');
+        return;
+      }
+
+      addLog('system', `Connecting to ${port} at ${baudRate} baud...`);
+      const result = await window.serialAPI.connect(port, baudRate, dataBits, parity, stopBits);
+
+      if (!result.success) {
+        addLog('error', `Connection failed: ${result.error}`);
+      }
+    }
+
+    // Disconnect from serial port
+    async function disconnect() {
+      const result = await window.serialAPI.disconnect();
+      if (result.success) {
+        addLog('system', 'Disconnected');
+      } else {
+        addLog('error', `Disconnect failed: ${result.error}`);
+      }
+    }
+
+    // Send data
+    async function sendData(data) {
+      if (!isConnected) {
+        addLog('error', 'Not connected');
+        return;
+      }
+
+      if (isSending) {
+        return; // Prevent duplicate sends
+      }
+
+      isSending = true;
+      const lineEnding = getLineEnding();
+      const fullData = data + lineEnding;
+
+      const result = await window.serialAPI.send(fullData);
+      if (result.success) {
+        if (data === '') {
+          addLog('tx', '(empty - use default)');
+        } else {
+          addLog('tx', data);
+        }
+        userInput.value = '';
+        // Wait for Enter key to be released before allowing next send
+        const waitForKeyRelease = () => {
+          if (enterKeyDown) {
+            setTimeout(waitForKeyRelease, 50);
+          } else {
+            isSending = false;
+            userInput.focus();
+          }
+        };
+        setTimeout(waitForKeyRelease, 100);
+      } else {
+        addLog('error', `Send failed: ${result.error}`);
+        isSending = false;
+      }
+    }
+
+    // Update connection status UI
+    function updateConnectionStatus(connected, portPath = null, baudRate = null) {
+      isConnected = connected;
+
+      if (connected) {
+        statusDot.className = 'w-3 h-3 rounded-full bg-green-500';
+        statusText.textContent = `Connected (${portPath})`;
+        connectBtn.textContent = 'Disconnect';
+        connectBtn.className = 'h-9 px-4 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors cursor-pointer';
+        userInput.disabled = false;
+        sendBtn.disabled = false;
+        portSelect.disabled = true;
+        baudrateSelect.disabled = true;
+        databitsSelect.disabled = true;
+        paritySelect.disabled = true;
+        stopbitsSelect.disabled = true;
+        userInput.focus();
+      } else {
+        statusDot.className = 'w-3 h-3 rounded-full bg-slate-300';
+        statusText.textContent = 'Disconnected';
+        connectBtn.textContent = 'Connect';
+        connectBtn.className = 'h-9 px-4 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition-colors cursor-pointer';
+        userInput.disabled = true;
+        sendBtn.disabled = true;
+        portSelect.disabled = false;
+        baudrateSelect.disabled = false;
+        databitsSelect.disabled = false;
+        paritySelect.disabled = false;
+        stopbitsSelect.disabled = false;
+        clearMcuPrompt();
+      }
+    }
+
+    // Buffer for incoming data
+    let receiveBuffer = '';
+    let bufferTimeout = null;
+    let isSending = false; // Prevent duplicate sends
+    let enterKeyDown = false; // Track Enter key state
+
+    // Event Listeners
+    refreshBtn.addEventListener('click', refreshPorts);
+
+    connectBtn.addEventListener('click', () => {
+      if (isConnected) {
+        disconnect();
+      } else {
+        connect();
+      }
+    });
+
+    sendBtn.addEventListener('click', () => {
+      const value = userInput.value.trim();
+      sendData(value); // Allow empty value for default
+    });
+
+    userInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault(); // Prevent default behavior
+        e.stopPropagation(); // Stop event propagation
+
+        // Only send if Enter was not already down (prevent key repeat)
+        if (!enterKeyDown) {
+          enterKeyDown = true;
+          const value = userInput.value.trim();
+          sendData(value); // Allow empty value for default
+        }
+      }
+    });
+
+    userInput.addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') {
+        enterKeyDown = false;
+      }
+    });
+
+    // Also reset enterKeyDown when input loses focus
+    userInput.addEventListener('blur', () => {
+      enterKeyDown = false;
+    });
+
+    clearLogBtn.addEventListener('click', () => {
+      logContainer.innerHTML = '<div class="log-entry log-system">[System] Log cleared</div>';
+    });
+
+    document.getElementById('clear-mcu-btn').addEventListener('click', () => {
+      clearMcuPrompt();
+      addLog('system', 'MCU messages cleared');
+    });
+
+    quickSendBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (isConnected) {
+          sendData(btn.dataset.value);
+        } else {
+          userInput.value = btn.dataset.value;
+        }
+      });
+    });
+
+    // Serial port event handlers
+    window.serialAPI.onStatusChange((status) => {
+      updateConnectionStatus(status.connected, status.port, status.baudRate);
+    });
+
+    window.serialAPI.onData((data) => {
+      // Clear previous timeout
+      if (bufferTimeout) {
+        clearTimeout(bufferTimeout);
+        bufferTimeout = null;
+      }
+
+      // Add to buffer
+      receiveBuffer += data;
+
+      // Check for complete messages (ending with newline or carriage return)
+      let lines = receiveBuffer.split(/[\r\n]+/);
+
+      // If there's no newline at the end, keep the last part in buffer
+      if (!receiveBuffer.endsWith('\r') && !receiveBuffer.endsWith('\n')) {
+        receiveBuffer = lines.pop();
+      } else {
+        receiveBuffer = '';
+      }
+
+      // Process complete lines
+      lines.forEach(line => {
+        line = line.trim();
+        if (line) {
+          addLog('rx', line);
+          updateMcuPrompt(line);
+        }
+      });
+
+      // If there's remaining data in buffer, set timeout to flush it
+      if (receiveBuffer.length > 0) {
+        bufferTimeout = setTimeout(() => {
+          const remaining = receiveBuffer.trim();
+          if (remaining) {
+            addLog('rx', remaining);
+            updateMcuPrompt(remaining);
+          }
+          receiveBuffer = '';
+          bufferTimeout = null;
+        }, 100); // Flush after 100ms of no new data
+      }
+    });
+
+    window.serialAPI.onError((error) => {
+      addLog('error', error);
+    });
+
+    // Initialize
+    refreshPorts();
+  </script>
+
+</body>
+</html>
