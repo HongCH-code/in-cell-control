@@ -715,8 +715,8 @@
       'CS5_Wiper3': 'cs5-wiper3'
     };
 
-    // Total parameter count for progress calculation
-    const totalParameters = Object.keys(parameterMap).length;
+    // Total parameter count for progress calculation (count unique inputs, not aliases)
+    const totalParameters = new Set(Object.values(parameterMap)).size;
 
     // ============================================
     // Debug Log Functions
@@ -747,6 +747,12 @@
     clearLogBtn.addEventListener('click', () => {
       debugLog.innerHTML = '<div class="log-entry"><span class="text-slate-500">[' + new Date().toLocaleTimeString('en-US', { hour12: false }) + ']</span> <span class="text-slate-400">[SYS]</span> Log cleared</div>';
     });
+
+    // ============================================
+    // Receiving Defaults State (after connection)
+    // ============================================
+    let isReceivingDefaults = false;
+    let receivedDefaultsCount = 0;
 
     // ============================================
     // Apply Settings State
@@ -823,6 +829,81 @@
         }
       }
       return null;
+    }
+
+    // ============================================
+    // Extract parameter name and value from MCU default message
+    // MCU formats:
+    //   "Model: 11"
+    //   "N frame for Dummy stabilization(T0): 5."
+    //   "Sensor TFT Drain Voltage(VD): 15.00"
+    //   "CS0_Wiper0: 128."
+    // ============================================
+    function extractParameterAndValue(message) {
+      // Aggressively clean the message: remove non-printable chars and normalize whitespace
+      const cleanedMessage = message
+        .replace(/[^\x20-\x7E]/g, ' ')  // Replace non-printable ASCII with space
+        .replace(/\s+/g, ' ')            // Normalize multiple spaces to single space
+        .trim();
+
+      // Try to match each parameter name
+      for (const paramName of Object.keys(parameterMap)) {
+        let value = null;
+
+        // Pattern 1: Parameter name in parentheses - "Description(PARAM): value."
+        // e.g., "N frame for Dummy stabilization(T0): 5."
+        const regexInParens = new RegExp(`\\(${paramName}\\)\\s*:\\s*([\\d.\\-]+)`);
+        let match = cleanedMessage.match(regexInParens);
+        if (match) {
+          value = match[1].replace(/\.$/, ''); // Remove trailing period
+          return { paramName, value };
+        }
+
+        // Pattern 2: Parameter name with colon (flexible, doesn't require start of line)
+        // e.g., "CS0_Wiper0: 128." or "Model: 11"
+        const regexWithColon = new RegExp(`\\b${paramName}\\s*:\\s*([\\d.\\-]+|\\S+)`);
+        match = cleanedMessage.match(regexWithColon);
+        if (match) {
+          value = match[1].replace(/\.$/, ''); // Remove trailing period
+          return { paramName, value };
+        }
+
+        // Pattern 3: Original format - "PARAM=value" or "PARAM value"
+        const regexWithEquals = new RegExp(`\\b${paramName}\\s*=\\s*(.+)$`, 'i');
+        match = cleanedMessage.match(regexWithEquals);
+        if (match) {
+          return { paramName, value: match[1].trim() };
+        }
+
+        const regexWithSpace = new RegExp(`\\b${paramName}\\s+([\\d.\\-]+)`, 'i');
+        match = cleanedMessage.match(regexWithSpace);
+        if (match) {
+          return { paramName, value: match[1] };
+        }
+      }
+      return null;
+    }
+
+    // ============================================
+    // Set parameter value in UI
+    // ============================================
+    function setParameterValue(paramName, value) {
+      const inputId = parameterMap[paramName];
+      if (!inputId) {
+        addLog('error', `Unknown parameter: ${paramName}`);
+        return false;
+      }
+
+      const input = document.getElementById(inputId);
+      if (!input) {
+        addLog('error', `Input element not found: ${inputId}`);
+        return false;
+      }
+
+      input.value = value;
+      // Trigger validation
+      validateInput(input);
+      return true;
     }
 
     // ============================================
@@ -1068,6 +1149,9 @@
         const result = await window.serialAPI.disconnect();
         if (result.success) {
           updateConnectionUI(false);
+          // Reset receiving defaults state
+          isReceivingDefaults = false;
+          receivedDefaultsCount = 0;
         } else {
           alert('Failed to disconnect: ' + result.error);
         }
@@ -1084,6 +1168,10 @@
         const result = await window.serialAPI.connect(port, baudRate);
         if (result.success) {
           updateConnectionUI(true, port, baudRate);
+          // Enable receiving defaults mode after connection
+          isReceivingDefaults = true;
+          receivedDefaultsCount = 0;
+          addLog('system', 'Connected. Waiting for MCU to send default parameter values...');
         } else {
           alert('Failed to connect: ' + result.error);
         }
@@ -1155,7 +1243,7 @@
     }
 
     // ============================================
-    // Serial Port Data Handling for Apply Mode
+    // Serial Port Data Handling
     // ============================================
     function handleMcuMessage(message) {
       addLog('rx', message);
@@ -1163,12 +1251,35 @@
       // Always store the last MCU message
       lastMcuMessage = message;
 
-      if (!isApplying) {
-        return;
+      // Handle receiving default values after connection
+      if (isReceivingDefaults) {
+        tryParseAndSetDefault(message);
       }
 
-      // Try to match and send
-      tryMatchAndSend(message);
+      // Handle apply mode
+      if (isApplying) {
+        tryMatchAndSend(message);
+      }
+    }
+
+    // ============================================
+    // Parse MCU default value and set in UI
+    // ============================================
+    function tryParseAndSetDefault(message) {
+      const result = extractParameterAndValue(message);
+      if (result) {
+        const { paramName, value } = result;
+        if (setParameterValue(paramName, value)) {
+          receivedDefaultsCount++;
+          addLog('match', `Received default: ${paramName} = ${value} (${receivedDefaultsCount}/${totalParameters})`);
+
+          // Check if all defaults received
+          if (receivedDefaultsCount >= totalParameters) {
+            addLog('system', 'All default parameter values received from MCU!');
+            isReceivingDefaults = false;
+          }
+        }
+      }
     }
 
     function tryMatchAndSend(message) {
@@ -1305,6 +1416,7 @@
 
       // Start applying
       isApplying = true;
+      isReceivingDefaults = false; // Stop receiving defaults mode
       sentCount = 0;
       currentParamIndex = 0; // Reset to start from first parameter
       receiveBuffer = '';
