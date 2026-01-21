@@ -30,3 +30,12 @@ contextBridge.exposeInMainWorld('serialAPI', {
     ipcRenderer.on('serial:error', (event, error) => callback(error));
   }
 });
+
+// Expose file import/export APIs to renderer process
+contextBridge.exposeInMainWorld('fileAPI', {
+  // Import settings from Excel file
+  importFromExcel: () => ipcRenderer.invoke('file:import'),
+
+  // Export settings to CSV file
+  exportToCSV: (data) => ipcRenderer.invoke('file:export', data)
+});

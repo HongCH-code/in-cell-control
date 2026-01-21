@@ -1,6 +1,8 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { SerialPort } = require('serialport');
+const XLSX = require('xlsx');
 
 let mainWindow;
 let serialPort = null;
@@ -130,6 +132,148 @@ ipcMain.handle('serial:send', async (event, data) => {
     await new Promise((resolve) => serialPort.drain(resolve));
 
     return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// ============================================
+// File Import/Export IPC Handlers
+// ============================================
+
+// Import from Excel file (.xlsx, .xls)
+ipcMain.handle('file:import', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Settings from Excel',
+      filters: [
+        { name: 'Excel Files', extensions: ['xlsx', 'xls'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false, canceled: true };
+    }
+
+    const filePath = result.filePaths[0];
+    const workbook = XLSX.readFile(filePath);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    // Parse data: B column (index 1) = parameter name, C column (index 2) = value
+    const parameters = {};
+    for (const row of data) {
+      if (row && row[1]) {
+        const paramName = String(row[1]).trim();
+        const value = row[2] !== undefined && row[2] !== null ? row[2] : '';
+        if (paramName && paramName !== 'Parameter') { // Skip header row
+          parameters[paramName] = value;
+        }
+      }
+    }
+
+    return { success: true, parameters, filePath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Export to Excel file (.xlsx) with same structure as import template
+ipcMain.handle('file:export', async (event, data) => {
+  try {
+    const { parameters, modelName } = data;
+
+    // Generate filename with timestamp
+    const now = new Date();
+    const timestamp = now.getFullYear().toString() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0') + '_' +
+      String(now.getHours()).padStart(2, '0') +
+      String(now.getMinutes()).padStart(2, '0') +
+      String(now.getSeconds()).padStart(2, '0');
+    const defaultName = `${modelName || 'Settings'}_${timestamp}.xlsx`;
+
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export Settings to Excel',
+      defaultPath: defaultName,
+      filters: [
+        { name: 'Excel Files', extensions: ['xlsx'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true };
+    }
+
+    // Define parameter structure with categories and ranges
+    const parameterStructure = [
+      { category: '', param: 'Model', range: '' },
+      { category: 'AC Timing', param: 'T0', range: '0~334' },
+      { category: '', param: 'T1', range: '0~334' },
+      { category: '', param: 'T2', range: '0~334' },
+      { category: '', param: 'T3', range: '0~334' },
+      { category: '', param: 'T4', range: '0~334' },
+      { category: '', param: 'T5', range: '0~334' },
+      { category: '', param: 'TSW1b', range: '0~334' },
+      { category: '', param: 'TSW2b', range: '0~334' },
+      { category: '', param: 'TSW3b', range: '0~334' },
+      { category: '', param: 'TSW3a', range: '0~334' },
+      { category: '', param: 'TSW2a', range: '0~334' },
+      { category: '', param: 'TSW1a', range: '0~334' },
+      { category: 'DC Electrial', param: 'VD', range: '7~30, step 0.5' },
+      { category: '', param: 'VG', range: '-18~-6, step 0.25' },
+      { category: 'Programble Gain Setting', param: 'CS0_Wiper0', range: '0~255' },
+      { category: '', param: 'CS0_Wiper1', range: '0~255' },
+      { category: '', param: 'CS0_Wiper2', range: '0~255' },
+      { category: '', param: 'CS0_Wiper3', range: '0~255' },
+      { category: '', param: 'CS1_Wiper0', range: '0~255' },
+      { category: '', param: 'CS1_Wiper1', range: '0~255' },
+      { category: '', param: 'CS1_Wiper2', range: '0~255' },
+      { category: '', param: 'CS1_Wiper3', range: '0~255' },
+      { category: '', param: 'CS2_Wiper0', range: '0~255' },
+      { category: '', param: 'CS2_Wiper1', range: '0~255' },
+      { category: '', param: 'CS2_Wiper2', range: '0~255' },
+      { category: '', param: 'CS2_Wiper3', range: '0~255' },
+      { category: '', param: 'CS3_Wiper0', range: '0~255' },
+      { category: '', param: 'CS3_Wiper1', range: '0~255' },
+      { category: '', param: 'CS3_Wiper2', range: '0~255' },
+      { category: '', param: 'CS3_Wiper3', range: '0~255' },
+      { category: '', param: 'CS4_Wiper0', range: '0~255' },
+      { category: '', param: 'CS4_Wiper1', range: '0~255' },
+      { category: '', param: 'CS4_Wiper2', range: '0~255' },
+      { category: '', param: 'CS4_Wiper3', range: '0~255' },
+      { category: '', param: 'CS5_Wiper0', range: '0~255' },
+      { category: '', param: 'CS5_Wiper1', range: '0~255' },
+      { category: '', param: 'CS5_Wiper2', range: '0~255' },
+      { category: '', param: 'CS5_Wiper3', range: '0~255' }
+    ];
+
+    // Build worksheet data: [Category, Parameter, Value, Range]
+    const wsData = [
+      ['Parameter', null, 'Value', 'Range'] // Header row
+    ];
+
+    for (const item of parameterStructure) {
+      const value = parameters[item.param] !== undefined ? parameters[item.param] : '';
+      wsData.push([
+        item.category || null,
+        item.param,
+        value === '' ? null : value,
+        item.range
+      ]);
+    }
+
+    // Create workbook and worksheet
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '工作表1');
+
+    // Write file
+    XLSX.writeFile(wb, result.filePath);
+    return { success: true, filePath: result.filePath };
   } catch (error) {
     return { success: false, error: error.message };
   }
