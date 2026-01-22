@@ -75,4 +75,5 @@ jobs:
           name: windows-build
           path: |
             dist/*.exe
+            dist/*-win.zip
           retention-days: 30
