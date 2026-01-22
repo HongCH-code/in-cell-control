@@ -31,8 +31,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build macOS app
-        run: npm run build:mac -- --publish never
+      - name: Build macOS app (with retry)
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          command: npm run build:mac -- --publish never
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
@@ -66,8 +70,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build Windows app
-        run: npm run build:win -- --publish never
+      - name: Build Windows app (with retry)
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          command: npm run build:win -- --publish never
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
